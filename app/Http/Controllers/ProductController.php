@@ -1,0 +1,154 @@
+<?php
+
+namespace App\Http\Controllers;
+use thiagoalessio\TesseractOCR\TesseractOCR;
+use Illuminate\Support\Facades\DB;
+
+// use App\Models\Product;
+use Illuminate\Http\Request;
+use App\Models\Product;
+use App\Models;
+class ProductController extends Controller
+{
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function index()
+    {
+        $products = Product::latest()->paginate(5);
+    
+        return view('products.index',compact('products'))
+            ->with('i', (request()->input('page', 1) - 1) * 5);
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function create()
+    {
+        
+        return view('products.create');
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        $request->validate([
+            // 'name' => 'required',
+            // 'detail' => 'required',
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+        ]);
+  
+        
+        // echo $parsedText;      
+        
+        // $input = $request->input('image');
+        // $name = $request->input('name');
+        // $detail = $request->input('detail');
+
+        // $request->image->storeAs('images', );
+  
+        if ($image = $request->file('image')) {
+            $destinationPath = 'image/';
+            $profileImage = date('YmdHis') . "." . $image->getClientOriginalExtension();
+            $image->move($destinationPath, $profileImage);
+            $input['image'] = "$profileImage";
+        }
+
+        $ocr = new TesseractOCR();
+        $ocr->image('image/'.$profileImage);
+
+        $parsedText = $ocr->run();
+
+        DB::table('products')->insert(
+            ['name' => $parsedText,
+            'image' => $profileImage,
+            'detail' => $parsedText
+            ]
+        );
+    
+        // Product::create($input);
+
+        // echo $destinationPath;
+        // echo $profileImage;
+     
+        return redirect()->route('products.index')
+                        ->with('success','Product created successfully.');
+    }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param  \App\Models\Product  $product
+     * @return \Illuminate\Http\Response
+     */
+    public function show(Product $product)
+    {
+        return view('products.show',compact('product'));
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     *
+     * @param  \App\Models\Product  $product
+     * @return \Illuminate\Http\Response
+     */
+    public function edit(Product $product)
+    {
+        return view('products.edit',compact('product'));
+    }
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Product  $product
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, Product $product)
+    {
+        // $request->validate([
+        //     'name' => 'required',
+        //     'detail' => 'required'
+        // ]);
+  
+        $input = $request->all();
+  
+        if ($image = $request->file('image')) {
+            $destinationPath = 'image/';
+            $profileImage = date('YmdHis') . "." . $image->getClientOriginalExtension();
+            $image->move($destinationPath, $profileImage);
+            $input['image'] = "$profileImage";
+        }else{
+            unset($input['image']);
+        }
+        
+        $product->update($input);
+    
+        return redirect()->route('products.index')
+                        ->with('success','Product updated successfully');
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param  \App\Models\Product  $product
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy(Product $product)
+    {
+        $product->delete();
+     
+        return redirect()->route('products.index')
+                        ->with('success','Product deleted successfully');
+    }
+}
